@@ -1,6 +1,6 @@
 //
-// detail/impl/epoll_reactor.hpp
-// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+// detail/impl/io_uring_service.hpp
+// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 //
 // Copyright (c) 2003-2021 Christopher M. Kohlhoff (chris at kohlhoff dot com)
 //
@@ -8,15 +8,14 @@
 // file LICENSE_1_0.txt or copy at http://www.boost.org/LICENSE_1_0.txt)
 //
 
-#ifndef BOOST_ASIO_DETAIL_IMPL_EPOLL_REACTOR_HPP
-#define BOOST_ASIO_DETAIL_IMPL_EPOLL_REACTOR_HPP
+#ifndef BOOST_ASIO_DETAIL_IMPL_IO_URING_SERVICE_HPP
+#define BOOST_ASIO_DETAIL_IMPL_IO_URING_SERVICE_HPP
 
 #if defined(_MSC_VER) && (_MSC_VER >= 1200)
 # pragma once
 #endif // defined(_MSC_VER) && (_MSC_VER >= 1200)
 
-#if defined(BOOST_ASIO_HAS_EPOLL) \
-  && !defined(BOOST_ASIO_HAS_IO_URING)
+#if defined(BOOST_ASIO_HAS_IO_URING)
 
 #include <boost/asio/detail/scheduler.hpp>
 
@@ -26,26 +25,26 @@ namespace boost {
 namespace asio {
 namespace detail {
 
-inline void epoll_reactor::post_immediate_completion(
+inline void io_uring_service::post_immediate_completion(
     operation* op, bool is_continuation)
 {
   scheduler_.post_immediate_completion(op, is_continuation);
 }
 
 template <typename Time_Traits>
-void epoll_reactor::add_timer_queue(timer_queue<Time_Traits>& queue)
+void io_uring_service::add_timer_queue(timer_queue<Time_Traits>& queue)
 {
   do_add_timer_queue(queue);
 }
 
 template <typename Time_Traits>
-void epoll_reactor::remove_timer_queue(timer_queue<Time_Traits>& queue)
+void io_uring_service::remove_timer_queue(timer_queue<Time_Traits>& queue)
 {
   do_remove_timer_queue(queue);
 }
 
 template <typename Time_Traits>
-void epoll_reactor::schedule_timer(timer_queue<Time_Traits>& queue,
+void io_uring_service::schedule_timer(timer_queue<Time_Traits>& queue,
     const typename Time_Traits::time_type& time,
     typename timer_queue<Time_Traits>::per_timer_data& timer, wait_op* op)
 {
@@ -60,11 +59,14 @@ void epoll_reactor::schedule_timer(timer_queue<Time_Traits>& queue,
   bool earliest = queue.enqueue_timer(time, timer, op);
   scheduler_.work_started();
   if (earliest)
+  {
     update_timeout();
+    post_submit_sqes_op(lock);
+  }
 }
 
 template <typename Time_Traits>
-std::size_t epoll_reactor::cancel_timer(timer_queue<Time_Traits>& queue,
+std::size_t io_uring_service::cancel_timer(timer_queue<Time_Traits>& queue,
     typename timer_queue<Time_Traits>::per_timer_data& timer,
     std::size_t max_cancelled)
 {
@@ -77,7 +79,7 @@ std::size_t epoll_reactor::cancel_timer(timer_queue<Time_Traits>& queue,
 }
 
 template <typename Time_Traits>
-void epoll_reactor::cancel_timer_by_key(timer_queue<Time_Traits>& queue,
+void io_uring_service::cancel_timer_by_key(timer_queue<Time_Traits>& queue,
     typename timer_queue<Time_Traits>::per_timer_data* timer,
     void* cancellation_key)
 {
@@ -89,7 +91,7 @@ void epoll_reactor::cancel_timer_by_key(timer_queue<Time_Traits>& queue,
 }
 
 template <typename Time_Traits>
-void epoll_reactor::move_timer(timer_queue<Time_Traits>& queue,
+void io_uring_service::move_timer(timer_queue<Time_Traits>& queue,
     typename timer_queue<Time_Traits>::per_timer_data& target,
     typename timer_queue<Time_Traits>::per_timer_data& source)
 {
@@ -107,7 +109,6 @@ void epoll_reactor::move_timer(timer_queue<Time_Traits>& queue,
 
 #include <boost/asio/detail/pop_options.hpp>
 
-#endif // defined(BOOST_ASIO_HAS_EPOLL)
-       //   && !defined(BOOST_ASIO_HAS_IO_URING)
+#endif // defined(BOOST_ASIO_HAS_IO_URING)
 
-#endif // BOOST_ASIO_DETAIL_IMPL_EPOLL_REACTOR_HPP
+#endif // BOOST_ASIO_DETAIL_IMPL_IO_URING_SERVICE_HPP
